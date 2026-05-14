@@ -195,7 +195,7 @@
           <th>Плав. убыток</th>
           <th>Equity</th>
           <th>% просадки</th>
-          <th>Уровень маржи</th>
+          
           <th>Статус</th>
         </tr>
       </thead>
@@ -284,6 +284,7 @@ function render() {
       3: '<span class="badge b3">Серия 3</span>'
     };
 
+    // Проверяем долив до отрисовки строки
     if (refillsLeft > 0 && loss >= balance * s.threshold) {
       const refillAmt = initDeposit;
       balance += refillAmt;
@@ -297,7 +298,7 @@ function render() {
         pipsNow, '—', fmt(totalVolume, 2),
         fmt(balance) + ' $', '−' + fmt(loss, 1) + ' $',
         fmt(eqA, 1) + ' $', fmt(loss/balance*100, 1) + '%',
-        fmt(eqA/mA*100, 0) + '%', '✅ Резерв добавлен'
+        '✅ Резерв добавлен'
       ], 'row-refill');
     }
 
@@ -306,15 +307,43 @@ function render() {
     const marginLevel = equity / margin * 100;
     const ddPct = loss / balance * 100;
 
+    // Проверяем stop out — ищем точное количество пипсов до ликвидации
     if (marginLevel <= STOP_OUT * 100) {
+      // Бинарный поиск точного числа пипсов от предыдущего ордера до ликвидации
+      const prevPips = i * s.step;
+      let lo = prevPips, hi = pipsNow, exactPips = pipsNow;
+      for (let iter = 0; iter < 40; iter++) {
+        const mid = (lo + hi) / 2;
+        // Считаем loss при движении на mid пипсов
+        let lossAtMid = 0;
+        for (let j = 0; j <= i; j++) {
+          const jLot = calcLot(startLot, j);
+          const jOpen = j * s.step;
+          if (mid > jOpen) lossAtMid += jLot * (mid - jOpen) * PIP_VAL;
+        }
+        const equityAtMid = balance - lossAtMid;
+        const mlAtMid = equityAtMid / margin * 100;
+        if (mlAtMid <= STOP_OUT * 100) { hi = mid; exactPips = mid; }
+        else { lo = mid; }
+      }
+      exactPips = Math.round(exactPips);
+      // Пересчитываем loss и equity на точном значении пипсов
+      let lossExact = 0;
+      for (let j = 0; j <= i; j++) {
+        const jLot = calcLot(startLot, j);
+        const jOpen = j * s.step;
+        if (exactPips > jOpen) lossExact += jLot * (exactPips - jOpen) * PIP_VAL;
+      }
+      const equityExact = balance - lossExact;
+      const ddExact = lossExact / balance * 100;
       liquidationOrder = i + 1;
-      liquidationPips = pipsNow;
+      liquidationPips = exactPips;
       addRow([
         `<span class="badge b-liq">⛔ Ликвидация</span> Ордер ${i+1}`,
-        pipsNow, fmt(lot, 2), fmt(totalVolume, 2),
-        fmt(balance) + ' $', '−' + fmt(loss, 1) + ' $',
-        fmt(equity, 1) + ' $', fmt(ddPct, 1) + '%',
-        fmt(marginLevel, 0) + '%', '⛔ Маржин-колл'
+        exactPips, fmt(lot, 2), fmt(totalVolume, 2),
+        fmt(balance) + ' $', '−' + fmt(lossExact, 1) + ' $',
+        fmt(equityExact, 1) + ' $', fmt(ddExact, 1) + '%',
+        '⛔ Маржин-колл'
       ], 'row-liq');
       break;
     }
@@ -325,7 +354,7 @@ function render() {
       pipsNow, fmt(lot, 2), fmt(totalVolume, 2),
       fmt(balance) + ' $', '−' + fmt(loss, 1) + ' $',
       fmt(equity, 1) + ' $', fmt(ddPct, 1) + '%',
-      fmt(marginLevel, 0) + '%', status
+      status
     ], ['','row-s1','row-s2','row-s3'][series]);
 
     if (i === MAX_ORDERS - 1 && !liquidationOrder) {
