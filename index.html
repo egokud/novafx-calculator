@@ -65,6 +65,16 @@
   .strat-btns { display: flex; gap: 6px; }
   .strat-btn { flex: 1; padding: 10px 4px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: transparent; font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; font-family: var(--font); }
   .strat-btn:hover { background: var(--bg-input); color: var(--text); }
+  .sliders-block { margin-bottom: 20px; }
+  .slider-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 520px) { .slider-row { grid-template-columns: 1fr; } }
+  .slider-group { display: flex; flex-direction: column; gap: 6px; }
+  .slider-label-row { display: flex; justify-content: space-between; align-items: center; }
+  .slider-val { font-size: 14px; font-weight: 700; color: var(--text); }
+  .param-slider { width: 100%; accent-color: var(--blue); cursor: pointer; }
+  .slider-limits { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-tertiary); }
+  .strat-btn.active-cons .slider-val, .strat-btn.active-cons ~ .slider-val { color: var(--green); }
+
   .strat-btn.active-cons { background: var(--green-bg); color: var(--green); border-color: var(--green-border); font-weight: 600; }
   .strat-btn.active-mod  { background: var(--blue-bg);  color: var(--blue);  border-color: var(--blue-border);  font-weight: 600; }
   .strat-btn.active-agg  { background: var(--red-bg);   color: var(--red);   border-color: var(--red-border);   font-weight: 600; }
@@ -148,6 +158,26 @@
       </div>
     </div>
   </div>
+  <div class="sliders-block" id="sliders-block">
+    <div class="slider-row">
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <span class="input-label">Lot Volume</span>
+          <span class="slider-val" id="val-vol">0.15</span>
+        </div>
+        <input type="range" class="param-slider" id="sl-vol" min="0.06" max="0.15" step="0.01" value="0.15">
+        <div class="slider-limits"><span id="sl-vol-min">0.06</span><span id="sl-vol-max">0.15</span></div>
+      </div>
+      <div class="slider-group">
+        <div class="slider-label-row">
+          <span class="input-label">Шаг усреднения (пипсов)</span>
+          <span class="slider-val" id="val-step">175</span>
+        </div>
+        <input type="range" class="param-slider" id="sl-step" min="165" max="195" step="1" value="175">
+        <div class="slider-limits"><span id="sl-step-min">165</span><span id="sl-step-max">195</span></div>
+      </div>
+    </div>
+  </div>
 
   <div class="summary">
     <div class="sum-card c-green">
@@ -163,7 +193,7 @@
     <div class="sum-card c-orange">
       <div class="sum-label">Ордеров до ликвидации</div>
       <div class="sum-val" id="s-orders-liq">—</div>
-      <div class="sum-sub">с учётом резерва</div>
+      <div class="sum-sub">ордеров в сетке</div>
     </div>
     <div class="sum-card c-red">
       <div class="sum-label">Пипсов до ликвидации</div>
@@ -218,14 +248,18 @@
 const PIP_VAL = 0.1;
 const MARGIN_PER_LOT = 0.01;
 const STOP_OUT = 0.30;
-const MAX_ORDERS = 20;
+const MAX_ORDERS = 200; // достаточно для любой стратегии
 const GROUP1 = 5, GROUP2 = 10;
 
 const STRATS = {
-  cons: { vol: 0.05, step: 200, threshold: 0.30, refills: 1 },
-  mod:  { vol: 0.15, step: 175, threshold: 0.25, refills: 2 },
-  agg:  { vol: 0.22, step: 155, threshold: 0.25, refills: 4 },
+  cons: { vol: 0.05, step: 200, threshold: 0.30, refills: 1, volMin: 0.01, volMax: 0.05, stepMin: 195, stepMax: 230 },
+  mod:  { vol: 0.15, step: 175, threshold: 0.25, refills: 2, volMin: 0.06, volMax: 0.15, stepMin: 165, stepMax: 195 },
+  agg:  { vol: 0.22, step: 155, threshold: 0.25, refills: 4, volMin: 0.16, volMax: 0.25, stepMin: 135, stepMax: 165 },
 };
+
+// Текущие кастомные значения
+let customVol = 0.15;
+let customStep = 175;
 
 let stratKey = 'mod';
 let initDeposit = 5000;
@@ -233,19 +267,29 @@ let initDeposit = 5000;
 function fmt(n, dec=0) { return n.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
 function calcStartLot(dep, vol) { return dep / 20000 * vol / 0.01; }
 
+const MAX_BOOSTED = 14; // 14 бустов начиная с 6го ордера
+// Серия 2 (ордера 6-10) занимает бусты 1-5 (лот фиксирован × 1.5)
+// Серия 3 (ордера 11-19) занимает бусты 6-14 (каждый × 1.5)
+// Ордера 20+ — лот фиксируется на уровне 19го ордера
+
 function calcLot(startLot, idx) {
+  // Серия 1: ордера 1-5 (idx 0-4) — стартовый лот
   if (idx < GROUP1) return startLot;
+  // Серия 2: ордера 6-10 (idx 5-9) — стартовый × 1.5, фиксированный (бусты 1-5)
   if (idx < GROUP2) return startLot * 1.5;
+  // Серия 3: ордера 11+ (idx 10+) — бусты 6-14
+  // idx=10 -> буст 6, idx=18 -> буст 14 (последний), idx=19+ -> фиксируется
+  const boostCount = Math.min(idx - GROUP2 + 1, MAX_BOOSTED - (GROUP2 - GROUP1));
   let lot = startLot * 1.5;
-  for (let i = GROUP2; i < idx; i++) lot *= 1.5;
+  for (let i = 0; i < boostCount; i++) lot *= 1.5;
   return lot;
 }
 
-function calcTotalLoss(startLot, s, orderCount) {
+function calcTotalLoss(startLot, step, orderCount) {
   let loss = 0;
   for (let j = 0; j < orderCount; j++) {
     const lot = calcLot(startLot, j);
-    const pipsInLoss = (orderCount - j) * s.step;
+    const pipsInLoss = (orderCount - j) * step;
     loss += lot * pipsInLoss * PIP_VAL;
   }
   return loss;
@@ -253,7 +297,7 @@ function calcTotalLoss(startLot, s, orderCount) {
 
 function render() {
   const s = STRATS[stratKey];
-  const startLot = calcStartLot(initDeposit, s.vol);
+  const startLot = calcStartLot(initDeposit, customVol);
   document.getElementById('s-lot').textContent = fmt(startLot, 2);
 
   let balance = initDeposit;
@@ -275,8 +319,8 @@ function render() {
   for (let i = 0; i < MAX_ORDERS; i++) {
     const lot = calcLot(startLot, i);
     totalVolume += lot;
-    const pipsNow = (i + 1) * s.step;
-    const loss = calcTotalLoss(startLot, s, i + 1);
+    const pipsNow = (i + 1) * customStep;
+    const loss = calcTotalLoss(startLot, customStep, i + 1);
     const series = i < GROUP1 ? 1 : i < GROUP2 ? 2 : 3;
     const badgeMap = {
       1: '<span class="badge b1">Серия 1</span>',
@@ -310,7 +354,7 @@ function render() {
     // Проверяем stop out — ищем точное количество пипсов до ликвидации
     if (marginLevel <= STOP_OUT * 100) {
       // Бинарный поиск точного числа пипсов от предыдущего ордера до ликвидации
-      const prevPips = i * s.step;
+      const prevPips = i * customStep;
       let lo = prevPips, hi = pipsNow, exactPips = pipsNow;
       for (let iter = 0; iter < 40; iter++) {
         const mid = (lo + hi) / 2;
@@ -318,7 +362,7 @@ function render() {
         let lossAtMid = 0;
         for (let j = 0; j <= i; j++) {
           const jLot = calcLot(startLot, j);
-          const jOpen = j * s.step;
+          const jOpen = j * customStep;
           if (mid > jOpen) lossAtMid += jLot * (mid - jOpen) * PIP_VAL;
         }
         const equityAtMid = balance - lossAtMid;
@@ -332,7 +376,7 @@ function render() {
       for (let j = 0; j <= i; j++) {
         const jLot = calcLot(startLot, j);
         const jOpen = j * s.step;
-        if (exactPips > jOpen) lossExact += jLot * (exactPips - jOpen) * PIP_VAL;
+        const jOpenLiq = j * customStep; if (exactPips > jOpenLiq) lossExact += jLot * (exactPips - jOpenLiq) * PIP_VAL;
       }
       const equityExact = balance - lossExact;
       const ddExact = lossExact / balance * 100;
@@ -374,11 +418,51 @@ function render() {
   fill.style.background = usedPct < 50 ? 'var(--green)' : usedPct < 80 ? 'var(--orange)' : 'var(--red)';
 }
 
+function updateSliders() {
+  const s = STRATS[stratKey];
+  const slVol = document.getElementById('sl-vol');
+  const slStep = document.getElementById('sl-step');
+  
+  slVol.min = s.volMin; slVol.max = s.volMax; slVol.step = 0.01;
+  slVol.value = s.vol;
+  customVol = s.vol;
+  document.getElementById('val-vol').textContent = s.vol.toFixed(2);
+  document.getElementById('sl-vol-min').textContent = s.volMin.toFixed(2);
+  document.getElementById('sl-vol-max').textContent = s.volMax.toFixed(2);
+
+  slStep.min = s.stepMin; slStep.max = s.stepMax; slStep.step = 1;
+  slStep.value = s.step;
+  customStep = s.step;
+  document.getElementById('val-step').textContent = s.step;
+  document.getElementById('sl-step-min').textContent = s.stepMin;
+  document.getElementById('sl-step-max').textContent = s.stepMax;
+
+  // Accent color by strategy
+  const colors = { cons: 'var(--green)', mod: 'var(--blue)', agg: 'var(--red)' };
+  slVol.style.accentColor = colors[stratKey];
+  slStep.style.accentColor = colors[stratKey];
+  document.getElementById('val-vol').style.color = colors[stratKey];
+  document.getElementById('val-step').style.color = colors[stratKey];
+}
+
+document.getElementById('sl-vol').addEventListener('input', e => {
+  customVol = parseFloat(e.target.value);
+  document.getElementById('val-vol').textContent = customVol.toFixed(2);
+  render();
+});
+
+document.getElementById('sl-step').addEventListener('input', e => {
+  customStep = parseInt(e.target.value);
+  document.getElementById('val-step').textContent = customStep;
+  render();
+});
+
 document.querySelectorAll('.strat-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     stratKey = btn.dataset.s;
     document.querySelectorAll('.strat-btn').forEach(b => b.className = 'strat-btn');
     btn.classList.add('active-' + stratKey);
+    updateSliders();
     render();
   });
 });
@@ -388,6 +472,7 @@ document.getElementById('in-deposit').addEventListener('input', e => {
   render();
 });
 
+updateSliders();
 render();
 </script>
 </body>
