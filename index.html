@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Калькулятор просадки — NovaFX</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --bg-card: #161b26;
+    --bg-input: #1e2535;
+    --border: #2a3245;
+    --border-light: #1e2535;
+    --text: #e8eaf0;
+    --text-secondary: #8892a4;
+    --text-tertiary: #5a6478;
+    --green: #22c55e;
+    --green-bg: rgba(34,197,94,0.1);
+    --green-border: rgba(34,197,94,0.25);
+    --blue: #3b82f6;
+    --blue-bg: rgba(59,130,246,0.1);
+    --blue-border: rgba(59,130,246,0.25);
+    --orange: #f59e0b;
+    --orange-bg: rgba(245,158,11,0.1);
+    --orange-border: rgba(245,158,11,0.25);
+    --red: #ef4444;
+    --red-bg: rgba(239,68,68,0.1);
+    --red-border: rgba(239,68,68,0.25);
+    --font: 'SF Pro Display', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono: 'SF Mono', 'Fira Code', monospace;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px 48px;
+  }
+
+  .container { max-width: 900px; margin: 0 auto; }
+
+  /* Header */
+  .header { margin-bottom: 32px; }
+  .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .logo-text { font-size: 13px; font-weight: 500; color: var(--text-secondary); letter-spacing: 0.08em; text-transform: uppercase; }
+  .header h1 { font-size: 26px; font-weight: 600; color: var(--text); line-height: 1.2; margin-bottom: 8px; }
+  .header p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+
+  /* Info bar */
+  .info-bar { background: var(--blue-bg); border: 0.5px solid var(--blue-border); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 24px; font-size: 13px; color: #93c5fd; line-height: 1.6; }
+
+  /* Inputs */
+  .inputs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  @media (max-width: 520px) { .inputs-grid { grid-template-columns: 1fr; } }
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+  .input-label { font-size: 11px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+  .input-field { padding: 10px 14px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: var(--bg-input); font-size: 14px; font-weight: 500; color: var(--text); font-family: var(--font); outline: none; width: 100%; transition: border-color 0.15s; }
+  .input-field:focus { border-color: var(--blue); }
+  .strat-btns { display: flex; gap: 6px; }
+  .strat-btn { flex: 1; padding: 10px 4px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: transparent; font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: all 0.15s; font-family: var(--font); }
+  .strat-btn:hover { background: var(--bg-input); color: var(--text); }
+  .strat-btn.active-cons { background: var(--green-bg); color: var(--green); border-color: var(--green-border); font-weight: 600; }
+  .strat-btn.active-mod  { background: var(--blue-bg);  color: var(--blue);  border-color: var(--blue-border);  font-weight: 600; }
+  .strat-btn.active-agg  { background: var(--red-bg);   color: var(--red);   border-color: var(--red-border);   font-weight: 600; }
+
+  /* Summary cards */
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
+  @media (max-width: 600px) { .summary { grid-template-columns: repeat(2, 1fr); } }
+  .sum-card { background: var(--bg-card); border: 0.5px solid var(--border-light); border-radius: var(--radius); padding: 14px 16px; }
+  .sum-label { font-size: 11px; color: var(--text-tertiary); margin-bottom: 6px; }
+  .sum-val { font-size: 18px; font-weight: 600; color: var(--text); line-height: 1.2; }
+  .sum-sub { font-size: 11px; color: var(--text-tertiary); margin-top: 3px; }
+  .sum-card.c-green .sum-val { color: var(--green); }
+  .sum-card.c-blue  .sum-val { color: var(--blue); }
+  .sum-card.c-orange .sum-val { color: var(--orange); }
+  .sum-card.c-red   .sum-val { color: var(--red); }
+
+  /* Bar */
+  .bar-wrap { margin-bottom: 24px; }
+  .bar-meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+  .bar-track { height: 6px; background: var(--bg-input); border-radius: 999px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 999px; transition: width 0.4s, background 0.4s; }
+
+  /* Table */
+  .section-label { font-size: 11px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 10px; }
+  .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 0.5px solid var(--border-light); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 700px; }
+  th { text-align: left; padding: 8px 10px; font-size: 10px; font-weight: 500; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 0.5px solid var(--border); background: var(--bg-card); white-space: nowrap; }
+  td { padding: 7px 10px; border-bottom: 0.5px solid var(--border-light); color: var(--text-secondary); white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  td:first-child { color: var(--text); font-weight: 500; }
+  .row-s1 td { background: var(--bg-card); }
+  .row-s2 td { background: #1a2030; }
+  .row-s3 td { background: rgba(245,158,11,0.05); }
+  .row-refill td { background: rgba(34,197,94,0.07) !important; color: var(--green) !important; font-weight: 500 !important; }
+  .row-liq td { background: rgba(239,68,68,0.1) !important; color: var(--red) !important; font-weight: 600 !important; }
+
+  /* Badges */
+  .badge { display: inline-block; font-size: 10px; padding: 2px 7px; border-radius: 6px; font-weight: 500; }
+  .b1 { background: var(--blue-bg); color: var(--blue); border: 0.5px solid var(--blue-border); }
+  .b2 { background: var(--green-bg); color: var(--green); border: 0.5px solid var(--green-border); }
+  .b3 { background: var(--orange-bg); color: var(--orange); border: 0.5px solid var(--orange-border); }
+  .b-ref { background: var(--green-bg); color: var(--green); border: 0.5px solid var(--green-border); font-weight: 700; }
+  .b-liq { background: var(--red-bg); color: var(--red); border: 0.5px solid var(--red-border); font-weight: 700; }
+
+  /* Disclaimer */
+  .disclaimer { margin-top: 24px; font-size: 12px; color: var(--text-tertiary); line-height: 1.7; padding: 14px 16px; border: 0.5px solid var(--border-light); border-radius: var(--radius); background: var(--bg-card); }
+
+  /* Footer */
+  .footer { margin-top: 40px; text-align: center; font-size: 12px; color: var(--text-tertiary); }
+  .footer a { color: var(--text-secondary); text-decoration: none; }
+  .footer a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="logo">
+      <div class="logo-dot"></div>
+      <span class="logo-text">NovaFX · DigitalNovaLabs</span>
+    </div>
+    <h1>Калькулятор просадки</h1>
+    <p>Показывает как развивается просадка по ордерам, когда срабатывают резервные доливы и где наступает ликвидация.</p>
+  </div>
+
+  <div class="info-bar">
+    Брокер RoboForex · Плечо 1:1000 · Stop out 30% · Маржа на 1 центовый лот = 0.01 $ · Сетка строится от первоначального депозита · Резерв добавляется по достижении порога просадки от текущего баланса
+  </div>
+
+  <div class="inputs-grid">
+    <div class="input-group">
+      <span class="input-label">Первоначальный депозит (USD)</span>
+      <input class="input-field" id="in-deposit" type="number" min="500" max="200000" step="500" value="5000">
+    </div>
+    <div class="input-group">
+      <span class="input-label">Стратегия</span>
+      <div class="strat-btns">
+        <button class="strat-btn" data-s="cons">Консерв.</button>
+        <button class="strat-btn active-mod" data-s="mod">Умеренная</button>
+        <button class="strat-btn" data-s="agg">Агрессив.</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary">
+    <div class="sum-card c-green">
+      <div class="sum-label">Стартовый лот</div>
+      <div class="sum-val" id="s-lot">—</div>
+      <div class="sum-sub">центовых лотов</div>
+    </div>
+    <div class="sum-card c-blue">
+      <div class="sum-label">Резервов добавлено</div>
+      <div class="sum-val" id="s-reserve">—</div>
+      <div class="sum-sub">USD</div>
+    </div>
+    <div class="sum-card c-orange">
+      <div class="sum-label">Ордеров до ликвидации</div>
+      <div class="sum-val" id="s-orders-liq">—</div>
+      <div class="sum-sub">с учётом резерва</div>
+    </div>
+    <div class="sum-card c-red">
+      <div class="sum-label">Пипсов до ликвидации</div>
+      <div class="sum-val" id="s-pips-liq">—</div>
+      <div class="sum-sub">движение рынка</div>
+    </div>
+  </div>
+
+  <div class="bar-wrap">
+    <div class="bar-meta">
+      <span>Использование капитала при ликвидации</span>
+      <span id="bar-pct">—</span>
+    </div>
+    <div class="bar-track">
+      <div class="bar-fill" id="bar-fill" style="width:0%;background:var(--green);"></div>
+    </div>
+  </div>
+
+  <div class="section-label">Развитие просадки по ордерам</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Событие</th>
+          <th>Пипсов</th>
+          <th>Лот ордера</th>
+          <th>Сумм. объём</th>
+          <th>Баланс счёта</th>
+          <th>Плав. убыток</th>
+          <th>Equity</th>
+          <th>% просадки</th>
+          <th>Уровень маржи</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody id="orders-body"></tbody>
+    </table>
+  </div>
+
+  <div class="disclaimer">
+    <strong style="color:#8892a4;">Важно понимать:</strong> Калькулятор показывает теоретическое развитие событий при движении рынка строго против позиции без откатов. Реальная торговля отличается — серии закрываются по тейкпрофиту при разворотах. Ликвидация наступает только если рынок непрерывно идёт против позиции до исчерпания всего капитала.<br><br>
+    Данные носят ознакомительный характер и не являются гарантией каких-либо результатов. Торговля на форекс сопряжена с рисками.
+  </div>
+
+  <div class="footer">
+    <p>NovaFX · <a href="https://t.me/DigitalNovaLabs" target="_blank">Telegram канал</a> · <a href="https://fxmonitor.online/g/VHI6xGy4?view=profit" target="_blank">Мониторинг 🕯</a></p>
+  </div>
+
+</div>
+
+<script>
+const PIP_VAL = 0.1;
+const MARGIN_PER_LOT = 0.01;
+const STOP_OUT = 0.30;
+const MAX_ORDERS = 20;
+const GROUP1 = 5, GROUP2 = 10;
+
+const STRATS = {
+  cons: { vol: 0.05, step: 200, threshold: 0.30, refills: 1 },
+  mod:  { vol: 0.15, step: 175, threshold: 0.25, refills: 2 },
+  agg:  { vol: 0.22, step: 155, threshold: 0.25, refills: 4 },
+};
+
+let stratKey = 'mod';
+let initDeposit = 5000;
+
+function fmt(n, dec=0) { return n.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
+function calcStartLot(dep, vol) { return dep / 20000 * vol / 0.01; }
+
+function calcLot(startLot, idx) {
+  if (idx < GROUP1) return startLot;
+  if (idx < GROUP2) return startLot * 1.5;
+  let lot = startLot * 1.5;
+  for (let i = GROUP2; i < idx; i++) lot *= 1.5;
+  return lot;
+}
+
+function calcTotalLoss(startLot, s, orderCount) {
+  let loss = 0;
+  for (let j = 0; j < orderCount; j++) {
+    const lot = calcLot(startLot, j);
+    const pipsInLoss = (orderCount - j) * s.step;
+    loss += lot * pipsInLoss * PIP_VAL;
+  }
+  return loss;
+}
+
+function render() {
+  const s = STRATS[stratKey];
+  const startLot = calcStartLot(initDeposit, s.vol);
+  document.getElementById('s-lot').textContent = fmt(startLot, 2);
+
+  let balance = initDeposit;
+  let totalReserveAdded = 0;
+  let refillsLeft = s.refills;
+  let liquidationOrder = null;
+  let liquidationPips = null;
+  let totalVolume = 0;
+  const tbody = document.getElementById('orders-body');
+  tbody.innerHTML = '';
+
+  function addRow(cells, rowClass) {
+    const tr = document.createElement('tr');
+    tr.className = rowClass || '';
+    tr.innerHTML = cells.map(c => `<td>${c}</td>`).join('');
+    tbody.appendChild(tr);
+  }
+
+  for (let i = 0; i < MAX_ORDERS; i++) {
+    const lot = calcLot(startLot, i);
+    totalVolume += lot;
+    const pipsNow = (i + 1) * s.step;
+    const loss = calcTotalLoss(startLot, s, i + 1);
+    const series = i < GROUP1 ? 1 : i < GROUP2 ? 2 : 3;
+    const badgeMap = {
+      1: '<span class="badge b1">Серия 1</span>',
+      2: '<span class="badge b2">Серия 2</span>',
+      3: '<span class="badge b3">Серия 3</span>'
+    };
+
+    if (refillsLeft > 0 && loss >= balance * s.threshold) {
+      const refillAmt = initDeposit;
+      balance += refillAmt;
+      totalReserveAdded += refillAmt;
+      refillsLeft--;
+      const refillNum = s.refills - refillsLeft;
+      const eqA = balance - loss;
+      const mA = totalVolume * MARGIN_PER_LOT;
+      addRow([
+        `<span class="badge b-ref">+ Резерв ${fmt(refillAmt)} $</span> Долив #${refillNum}`,
+        pipsNow, '—', fmt(totalVolume, 2),
+        fmt(balance) + ' $', '−' + fmt(loss, 1) + ' $',
+        fmt(eqA, 1) + ' $', fmt(loss/balance*100, 1) + '%',
+        fmt(eqA/mA*100, 0) + '%', '✅ Резерв добавлен'
+      ], 'row-refill');
+    }
+
+    const equity = balance - loss;
+    const margin = totalVolume * MARGIN_PER_LOT;
+    const marginLevel = equity / margin * 100;
+    const ddPct = loss / balance * 100;
+
+    if (marginLevel <= STOP_OUT * 100) {
+      liquidationOrder = i + 1;
+      liquidationPips = pipsNow;
+      addRow([
+        `<span class="badge b-liq">⛔ Ликвидация</span> Ордер ${i+1}`,
+        pipsNow, fmt(lot, 2), fmt(totalVolume, 2),
+        fmt(balance) + ' $', '−' + fmt(loss, 1) + ' $',
+        fmt(equity, 1) + ' $', fmt(ddPct, 1) + '%',
+        fmt(marginLevel, 0) + '%', '⛔ Маржин-колл'
+      ], 'row-liq');
+      break;
+    }
+
+    const status = ddPct >= 70 ? '🔴 Критично' : ddPct >= 40 ? '🟡 Внимание' : '🟢 Норма';
+    addRow([
+      `${badgeMap[series]} Ордер ${i+1}`,
+      pipsNow, fmt(lot, 2), fmt(totalVolume, 2),
+      fmt(balance) + ' $', '−' + fmt(loss, 1) + ' $',
+      fmt(equity, 1) + ' $', fmt(ddPct, 1) + '%',
+      fmt(marginLevel, 0) + '%', status
+    ], ['','row-s1','row-s2','row-s3'][series]);
+
+    if (i === MAX_ORDERS - 1 && !liquidationOrder) {
+      liquidationOrder = '>20'; liquidationPips = '>' + pipsNow;
+    }
+  }
+
+  document.getElementById('s-reserve').textContent = fmt(totalReserveAdded) + ' $';
+  document.getElementById('s-orders-liq').textContent = liquidationOrder || '>20';
+  document.getElementById('s-pips-liq').textContent = liquidationPips || '—';
+
+  const totalCap = initDeposit + totalReserveAdded;
+  const usedPct = Math.min(100, totalCap > 0 ? totalReserveAdded / totalCap * 100 : 0);
+  document.getElementById('bar-pct').textContent = fmt(usedPct, 1) + '%';
+  const fill = document.getElementById('bar-fill');
+  fill.style.width = usedPct + '%';
+  fill.style.background = usedPct < 50 ? 'var(--green)' : usedPct < 80 ? 'var(--orange)' : 'var(--red)';
+}
+
+document.querySelectorAll('.strat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    stratKey = btn.dataset.s;
+    document.querySelectorAll('.strat-btn').forEach(b => b.className = 'strat-btn');
+    btn.classList.add('active-' + stratKey);
+    render();
+  });
+});
+
+document.getElementById('in-deposit').addEventListener('input', e => {
+  initDeposit = Math.max(0, Math.min(200000, parseInt(e.target.value) || 0));
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
