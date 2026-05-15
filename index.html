@@ -381,44 +381,28 @@ function rateFailed() {
   if (ind) { ind.textContent = '● Введите курс вручную'; ind.style.color = '#f59e0b'; }
 }
 
-// Источник 1: Wise (реальный межбанковский форекс курс)
-fetch('https://api.wise.com/v1/rates?source=EUR&target=USD')
+// Alpha Vantage FX_INTRADAY — реальный форекс курс EUR/USD
+fetch('https://www.alphavantage.co/query?function=FX_INTRADAY&from_symbol=EUR&to_symbol=USD&interval=1min&outputsize=compact&apikey=IULVRDUS5WVSUZIY')
   .then(function(r){ return r.json(); })
   .then(function(data){
-    if (Array.isArray(data) && data[0] && data[0].rate) {
-      setRate(data[0].rate, 'Wise Forex');
+    var ts = data['Time Series FX (1min)'];
+    if (ts) {
+      var latest = Object.keys(ts)[0];
+      var rate = parseFloat(ts[latest]['4. close']);
+      if (rate) { setRate(rate, 'Alpha Vantage Forex'); }
+      else { throw new Error('no rate'); }
     } else { throw new Error('no data'); }
   })
   .catch(function(){
-    // Источник 2: Polygon.io forex (бесплатный тариф)
-    fetch('https://api.polygon.io/v2/last/forex/EUR/USD?apiKey=aSbJMKRhAf8S5xH3L_6jHn7zEnFdR7W6')
+    // Резерв: open.er-api.com
+    fetch('https://open.er-api.com/v6/latest/EUR')
       .then(function(r){ return r.json(); })
       .then(function(data){
-        if (data && data.last && data.last.ask) {
-          setRate((data.last.ask + data.last.bid) / 2, 'Polygon Forex');
-        } else { throw new Error('no data'); }
+        if (data && data.rates && data.rates.USD) {
+          setRate(data.rates.USD, 'ExchangeRate API');
+        } else { rateFailed(); }
       })
-      .catch(function(){
-        // Источник 3: ForexRateAPI
-        fetch('https://www.freeforexapi.com/api/live?pairs=EURUSD')
-          .then(function(r){ return r.json(); })
-          .then(function(data){
-            if (data && data.rates && data.rates.EURUSD && data.rates.EURUSD.rate) {
-              setRate(data.rates.EURUSD.rate, 'ForexRateAPI');
-            } else { throw new Error('no data'); }
-          })
-          .catch(function(){
-            // Источник 4: Twelve Data (бесплатный)
-            fetch('https://api.twelvedata.com/price?symbol=EUR/USD&apikey=demo')
-              .then(function(r){ return r.json(); })
-              .then(function(data){
-                if (data && data.price) {
-                  setRate(parseFloat(data.price), 'Twelve Data');
-                } else { rateFailed(); }
-              })
-              .catch(rateFailed);
-          });
-      });
+      .catch(rateFailed);
   });
 </script>
 </body>
