@@ -394,15 +394,7 @@ fetch('https://www.alphavantage.co/query?function=FX_INTRADAY&from_symbol=EUR&to
     } else { throw new Error('no data'); }
   })
   .catch(function(){
-    // Резерв: open.er-api.com
-    fetch('https://open.er-api.com/v6/latest/EUR')
-      .then(function(r){ return r.json(); })
-      .then(function(data){
-        if (data && data.rates && data.rates.USD) {
-          setRate(data.rates.USD, 'ExchangeRate API');
-        } else { rateFailed(); }
-      })
-      .catch(rateFailed);
+    rateFailed();
   });
 </script>
 </body>
