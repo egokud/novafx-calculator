@@ -97,6 +97,7 @@
     <div class="input-group">
       <span class="input-label">Курс EUR/USD</span>
       <input class="input-field" id="in-rate" type="number" min="0.5" max="2" step="0.0001" value="1.1800">
+      <span id="rate-indicator" style="font-size:11px;color:#5a6478;">● Загружаем курс...</span>
     </div>
     <div class="input-group">
       <span class="input-label">Стратегия</span>
@@ -362,6 +363,26 @@ document.querySelectorAll('.refill-btn').forEach(function(btn) {
 
 updateSliders();
 render();
+
+// Автозагрузка курса EUR/USD
+fetch('https://api.frankfurter.app/latest?from=EUR&to=USD')
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    if (data && data.rates && data.rates.USD) {
+      var rate = data.rates.USD;
+      eurusd = rate;
+      var input = document.getElementById('in-rate');
+      input.value = rate.toFixed(4);
+      render();
+      // Show indicator
+      var ind = document.getElementById('rate-indicator');
+      if (ind) { ind.textContent = '● Курс обновлён автоматически'; ind.style.color = '#22c55e'; }
+    }
+  })
+  .catch(function(){
+    var ind = document.getElementById('rate-indicator');
+    if (ind) { ind.textContent = '● Введите курс вручную'; ind.style.color = '#f59e0b'; }
+  });
 </script>
 </body>
 </html>
