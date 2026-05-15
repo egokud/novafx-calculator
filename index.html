@@ -364,24 +364,45 @@ document.querySelectorAll('.refill-btn').forEach(function(btn) {
 updateSliders();
 render();
 
-// Автозагрузка курса EUR/USD
-fetch('https://api.frankfurter.app/latest?from=EUR&to=USD')
+// Автозагрузка курса EUR/USD — пробуем несколько источников
+function setRate(rate) {
+  eurusd = rate;
+  document.getElementById('in-rate').value = rate.toFixed(4);
+  render();
+  var ind = document.getElementById('rate-indicator');
+  if (ind) { ind.textContent = '● Курс обновлён автоматически'; ind.style.color = '#22c55e'; }
+}
+
+function rateFailed() {
+  var ind = document.getElementById('rate-indicator');
+  if (ind) { ind.textContent = '● Введите курс вручную'; ind.style.color = '#f59e0b'; }
+}
+
+// Источник 1: open.er-api.com
+fetch('https://open.er-api.com/v6/latest/EUR')
   .then(function(r){ return r.json(); })
   .then(function(data){
-    if (data && data.rates && data.rates.USD) {
-      var rate = data.rates.USD;
-      eurusd = rate;
-      var input = document.getElementById('in-rate');
-      input.value = rate.toFixed(4);
-      render();
-      // Show indicator
-      var ind = document.getElementById('rate-indicator');
-      if (ind) { ind.textContent = '● Курс обновлён автоматически'; ind.style.color = '#22c55e'; }
-    }
+    if (data && data.rates && data.rates.USD) { setRate(data.rates.USD); }
+    else { throw new Error('no data'); }
   })
   .catch(function(){
-    var ind = document.getElementById('rate-indicator');
-    if (ind) { ind.textContent = '● Введите курс вручную'; ind.style.color = '#f59e0b'; }
+    // Источник 2: cdn.jsdelivr.net (кэш exchangerate-api)
+    fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json')
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        if (data && data.eur && data.eur.usd) { setRate(data.eur.usd); }
+        else { throw new Error('no data'); }
+      })
+      .catch(function(){
+        // Источник 3: exchangerate.host
+        fetch('https://api.exchangerate.host/latest?base=EUR&symbols=USD')
+          .then(function(r){ return r.json(); })
+          .then(function(data){
+            if (data && data.rates && data.rates.USD) { setRate(data.rates.USD); }
+            else { rateFailed(); }
+          })
+          .catch(rateFailed);
+      });
   });
 </script>
 </body>
