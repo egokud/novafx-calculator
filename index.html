@@ -96,7 +96,7 @@
     </div>
     <div class="input-group">
       <span class="input-label">Курс EUR/USD</span>
-      <input class="input-field" id="in-rate" type="number" min="0.5" max="2" step="0.0001" value="1.1800">
+      <input class="input-field" id="in-rate" type="number" min="0.5" max="2" step="0.00001" value="1.18000">
       <span id="rate-indicator" style="font-size:11px;color:#5a6478;">● Загружаем курс...</span>
     </div>
     <div class="input-group">
@@ -364,13 +364,16 @@ document.querySelectorAll('.refill-btn').forEach(function(btn) {
 updateSliders();
 render();
 
-// Автозагрузка курса EUR/USD — пробуем несколько источников
-function setRate(rate) {
+// Автозагрузка форекс курса EUR/USD
+function setRate(rate, source) {
   eurusd = rate;
-  document.getElementById('in-rate').value = rate.toFixed(4);
+  document.getElementById('in-rate').value = rate.toFixed(5);
   render();
   var ind = document.getElementById('rate-indicator');
-  if (ind) { ind.textContent = '● Курс обновлён автоматически'; ind.style.color = '#22c55e'; }
+  if (ind) {
+    ind.textContent = '● Курс: ' + rate.toFixed(5) + ' (' + source + ')';
+    ind.style.color = '#22c55e';
+  }
 }
 
 function rateFailed() {
@@ -378,30 +381,43 @@ function rateFailed() {
   if (ind) { ind.textContent = '● Введите курс вручную'; ind.style.color = '#f59e0b'; }
 }
 
-// Источник 1: open.er-api.com
-fetch('https://open.er-api.com/v6/latest/EUR')
+// Источник 1: Wise (реальный межбанковский форекс курс)
+fetch('https://api.wise.com/v1/rates?source=EUR&target=USD')
   .then(function(r){ return r.json(); })
   .then(function(data){
-    if (data && data.rates && data.rates.USD) { setRate(data.rates.USD); }
-    else { throw new Error('no data'); }
+    if (Array.isArray(data) && data[0] && data[0].rate) {
+      setRate(data[0].rate, 'Wise Forex');
+    } else { throw new Error('no data'); }
   })
   .catch(function(){
-    // Источник 2: cdn.jsdelivr.net (кэш exchangerate-api)
-    fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json')
+    // Источник 2: Polygon.io forex (бесплатный тариф)
+    fetch('https://api.polygon.io/v2/last/forex/EUR/USD?apiKey=aSbJMKRhAf8S5xH3L_6jHn7zEnFdR7W6')
       .then(function(r){ return r.json(); })
       .then(function(data){
-        if (data && data.eur && data.eur.usd) { setRate(data.eur.usd); }
-        else { throw new Error('no data'); }
+        if (data && data.last && data.last.ask) {
+          setRate((data.last.ask + data.last.bid) / 2, 'Polygon Forex');
+        } else { throw new Error('no data'); }
       })
       .catch(function(){
-        // Источник 3: exchangerate.host
-        fetch('https://api.exchangerate.host/latest?base=EUR&symbols=USD')
+        // Источник 3: ForexRateAPI
+        fetch('https://www.freeforexapi.com/api/live?pairs=EURUSD')
           .then(function(r){ return r.json(); })
           .then(function(data){
-            if (data && data.rates && data.rates.USD) { setRate(data.rates.USD); }
-            else { rateFailed(); }
+            if (data && data.rates && data.rates.EURUSD && data.rates.EURUSD.rate) {
+              setRate(data.rates.EURUSD.rate, 'ForexRateAPI');
+            } else { throw new Error('no data'); }
           })
-          .catch(rateFailed);
+          .catch(function(){
+            // Источник 4: Twelve Data (бесплатный)
+            fetch('https://api.twelvedata.com/price?symbol=EUR/USD&apikey=demo')
+              .then(function(r){ return r.json(); })
+              .then(function(data){
+                if (data && data.price) {
+                  setRate(parseFloat(data.price), 'Twelve Data');
+                } else { rateFailed(); }
+              })
+              .catch(rateFailed);
+          });
       });
   });
 </script>
