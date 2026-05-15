@@ -34,6 +34,8 @@
   .strat-btn.active-cons { background: var(--green-bg); color: var(--green); border-color: var(--green-border); font-weight: 600; }
   .strat-btn.active-mod  { background: var(--blue-bg);  color: var(--blue);  border-color: var(--blue-border);  font-weight: 600; }
   .strat-btn.active-agg  { background: var(--red-bg);   color: var(--red);   border-color: var(--red-border);   font-weight: 600; }
+  .refill-btn { flex: 1; padding: 10px 4px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: transparent; font-size: 12px; color: var(--text-secondary); cursor: pointer; font-family: inherit; }
+  .refill-btn.active-refill { background: var(--blue-bg); color: var(--blue); border-color: var(--blue-border); font-weight: 600; }
   .sliders-block { margin-bottom: 20px; }
   .slider-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 520px) { .slider-row { grid-template-columns: 1fr; } }
@@ -127,11 +129,22 @@
     </div>
   </div>
 
-  <div class="summary">
+  <div id="refills-block" style="display:none;margin-bottom:16px;">
+    <div class="input-group" style="max-width:300px;">
+      <span class="input-label">Количество доливов (умеренная)</span>
+      <div class="strat-btns">
+        <button class="refill-btn active-refill" data-r="1">1 долив (+100%)</button>
+        <button class="refill-btn" data-r="2">2 долива (+200%)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="summary" style="grid-template-columns:repeat(5,1fr);">
     <div class="sum-card c-green"><div class="sum-label">Стартовый лот</div><div class="sum-val" id="s-lot">—</div><div class="sum-sub">центовых лотов</div></div>
-    <div class="sum-card c-blue"><div class="sum-label">Резервов добавлено</div><div class="sum-val" id="s-reserve">—</div><div class="sum-sub">USD</div></div>
+    <div class="sum-card c-blue"><div class="sum-label">Резервов добавлено</div><div class="sum-val" id="s-reserve">—</div><div class="sum-sub" id="s-reserve-sub">USD</div></div>
     <div class="sum-card c-orange"><div class="sum-label">Ордеров до ликвидации</div><div class="sum-val" id="s-orders-liq">—</div><div class="sum-sub">ордеров в сетке</div></div>
     <div class="sum-card c-red"><div class="sum-label">Пипсов до ликвидации</div><div class="sum-val" id="s-pips-liq">—</div><div class="sum-sub">движение рынка</div></div>
+    <div class="sum-card c-red"><div class="sum-label">Цена ликвидации (Buy)</div><div class="sum-val" id="s-price-liq">—</div><div class="sum-sub">EUR/USD</div></div>
   </div>
 
   <div class="bar-wrap">
@@ -165,17 +178,17 @@
 </div>
 
 <script>
-const PIP_VAL = 0.1, STOP_OUT = 0.30;
+const PIP_VAL = 0.01, STOP_OUT = 0.30; // 5-значные котировки EURUSD
 function getMarginPerLot() { return eurusd * 0.752; }
 const MAX_ORDERS = 200, GROUP1 = 5, GROUP2 = 10, MAX_BOOSTED = 14;
 
 const STRATS = {
   cons: { vol:0.05, step:200, threshold:0.30, refills:1, volMin:0.01, volMax:0.05, stepMin:195, stepMax:230, color:'#22c55e' },
-  mod:  { vol:0.15, step:175, threshold:0.25, refills:2, volMin:0.06, volMax:0.15, stepMin:165, stepMax:195, color:'#3b82f6' },
+  mod:  { vol:0.15, step:175, threshold:0.25, refills:2, volMin:0.06, volMax:0.15, stepMin:165, stepMax:230, color:'#3b82f6' },
   agg:  { vol:0.22, step:155, threshold:0.25, refills:4, volMin:0.16, volMax:0.25, stepMin:135, stepMax:165, color:'#ef4444' },
 };
 
-let stratKey = 'mod', customVol = 0.15, customStep = 175, initDeposit = 5000, eurusd = 1.18;
+let stratKey = 'mod', customVol = 0.15, customStep = 175, initDeposit = 5000, eurusd = 1.18, customRefills = 2;
 
 function fmt(n, dec) { dec = dec || 0; return n.toFixed(dec).replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
 function calcStartLot(dep, vol) { return dep / 20000 * vol / 0.01; }
@@ -205,7 +218,8 @@ function render() {
   var startLot = calcStartLot(initDeposit, customVol);
   document.getElementById('s-lot').textContent = fmt(startLot, 2);
 
-  var balance = initDeposit, totalReserveAdded = 0, refillsLeft = s.refills;
+  var actualRefills = (stratKey === 'mod') ? customRefills : s.refills;
+  var balance = initDeposit, totalReserveAdded = 0, refillsLeft = actualRefills;
   var liquidationOrder = null, liquidationPips = null, totalVolume = 0;
   var tbody = document.getElementById('orders-body');
   tbody.innerHTML = '';
@@ -274,8 +288,17 @@ function render() {
   }
 
   document.getElementById('s-reserve').textContent = fmt(totalReserveAdded)+' $';
+  var actualRef = (stratKey === 'mod') ? customRefills : STRATS[stratKey].refills;
+  document.getElementById('s-reserve-sub').textContent = '+' + (actualRef * 100) + '% резерв';
   document.getElementById('s-orders-liq').textContent = liquidationOrder || '>200';
   document.getElementById('s-pips-liq').textContent = liquidationPips || '—';
+  // Calculate liquidation price
+  if (liquidationPips && liquidationPips !== '>200') {
+    var liqPrice = eurusd - (liquidationPips * 0.00001);
+    document.getElementById('s-price-liq').textContent = liqPrice.toFixed(5);
+  } else {
+    document.getElementById('s-price-liq').textContent = liquidationPips === '>200' ? '< ' + (eurusd - 200*0.00001).toFixed(5) : '—';
+  }
   var usedPct = Math.min(100, (initDeposit+totalReserveAdded)>0 ? totalReserveAdded/(initDeposit+totalReserveAdded)*100 : 0);
   document.getElementById('bar-pct').textContent = fmt(usedPct,1)+'%';
   var fill = document.getElementById('bar-fill');
@@ -296,6 +319,8 @@ function updateSliders() {
   document.getElementById('sl-step-max').textContent = s.stepMax;
   document.getElementById('val-vol').style.color = s.color;
   document.getElementById('val-step').style.color = s.color;
+  // Show refills selector only for moderate
+  document.getElementById('refills-block').style.display = stratKey === 'mod' ? 'block' : 'none';
 }
 
 document.getElementById('sl-vol').addEventListener('input', function(e) {
@@ -324,6 +349,14 @@ document.getElementById('in-deposit').addEventListener('input', function(e) {
 document.getElementById('in-rate').addEventListener('input', function(e) {
   eurusd = Math.max(0.5, Math.min(2.0, parseFloat(e.target.value)||1.18));
   render();
+});
+document.querySelectorAll('.refill-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    customRefills = parseInt(btn.dataset.r);
+    document.querySelectorAll('.refill-btn').forEach(function(b){ b.className = 'refill-btn'; });
+    btn.classList.add('active-refill');
+    render();
+  });
 });
 
 
