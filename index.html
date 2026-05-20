@@ -36,14 +36,46 @@
   .strat-btn.active-agg  { background: var(--red-bg);   color: var(--red);   border-color: var(--red-border);   font-weight: 600; }
   .refill-btn { flex: 1; padding: 10px 4px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: transparent; font-size: 12px; color: var(--text-secondary); cursor: pointer; font-family: inherit; text-align: center; display: flex; align-items: center; justify-content: center; }
   .refill-btn.active-refill { background: var(--blue-bg); color: var(--blue); border-color: var(--blue-border); font-weight: 600; }
+  .refill-btn.agg-only { display: none; }
   .sliders-block { margin-bottom: 20px; }
   .slider-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media (max-width: 520px) { .slider-row { grid-template-columns: 1fr; } }
   .slider-group { display: flex; flex-direction: column; gap: 5px; }
   .slider-label-row { display: flex; justify-content: space-between; }
   .slider-val { font-size: 14px; font-weight: 700; }
-  .param-slider { width: 100%; cursor: pointer; }
-  .slider-limits { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-tertiary); }
+  .param-slider {
+    width: 100%; cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+    height: 6px; border-radius: 999px;
+    background: var(--border); outline: none;
+    margin: 6px 0;
+  }
+  .param-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--text); cursor: pointer;
+    border: 3px solid var(--bg-input);
+    box-shadow: 0 0 0 1.5px var(--border);
+    margin-top: -8px;
+  }
+  .param-slider::-moz-range-thumb {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--text); cursor: pointer;
+    border: 3px solid var(--bg-input);
+    box-shadow: 0 0 0 1.5px var(--border);
+  }
+  .param-slider::-webkit-slider-runnable-track {
+    height: 6px; border-radius: 999px;
+  }
+  .param-slider::-moz-range-track {
+    height: 6px; border-radius: 999px;
+    background: var(--border);
+  }
+  .param-slider::-moz-range-progress {
+    height: 6px; border-radius: 999px;
+    background: currentColor;
+  }
+  .slider-limits { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-tertiary); margin-top: 6px; }
   .summary { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; margin-bottom: 16px; }
   @media (max-width: 600px) { .summary { grid-template-columns: repeat(2,1fr); } }
   .sum-card { background: var(--bg-card); border: 0.5px solid var(--border-light); border-radius: var(--radius); padding: 14px 16px; }
@@ -136,8 +168,8 @@
       <div class="strat-btns">
         <button class="refill-btn active-refill" data-r="1">1 долив (+100%)</button>
         <button class="refill-btn" data-r="2">2 долива (+200%)</button>
-        <button class="refill-btn agg-only" data-r="3" style="display:none;">3 долива (+300%)</button>
-        <button class="refill-btn agg-only" data-r="4" style="display:none;">4 долива (+400%)</button>
+        <button class="refill-btn agg-only" data-r="3">3 долива (+300%)</button>
+        <button class="refill-btn agg-only" data-r="4">4 долива (+400%)</button>
       </div>
     </div>
   </div>
@@ -307,6 +339,12 @@ function render() {
 
 }
 
+function fillSlider(el, color) {
+  var min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
+  var pct = (val - min) / (max - min) * 100;
+  el.style.background = 'linear-gradient(to right, ' + color + ' 0%, ' + color + ' ' + pct + '%, var(--border) ' + pct + '%, var(--border) 100%)';
+}
+
 function updateSliders() {
   var s = STRATS[stratKey];
   var slV = document.getElementById('sl-vol'), slS = document.getElementById('sl-step');
@@ -320,22 +358,24 @@ function updateSliders() {
   document.getElementById('sl-step-max').textContent = s.stepMax;
   document.getElementById('val-vol').style.color = s.color;
   document.getElementById('val-step').style.color = s.color;
+  fillSlider(document.getElementById('sl-vol'), s.color);
+  fillSlider(document.getElementById('sl-step'), s.color);
   // Show refills selector only for moderate
   document.getElementById('refills-block').style.display = (stratKey === 'mod' || stratKey === 'cons' || stratKey === 'agg') ? 'block' : 'none';
   if (stratKey === 'cons') {
     customRefills = 1;
     document.querySelectorAll('.refill-btn').forEach(function(b){ b.className = b.classList.contains('agg-only') ? 'refill-btn agg-only' : 'refill-btn'; });
-    document.querySelectorAll('.refill-btn.agg-only').forEach(function(b){ b.style.display = 'none'; });
+    document.querySelectorAll('.refill-btn.agg-only').forEach(function(b){ b.setAttribute('style', 'display:none;'); });
     document.querySelector('.refill-btn[data-r="1"]').classList.add('active-refill');
   } else if (stratKey === 'mod') {
     customRefills = 2;
     document.querySelectorAll('.refill-btn').forEach(function(b){ b.className = b.classList.contains('agg-only') ? 'refill-btn agg-only' : 'refill-btn'; });
-    document.querySelectorAll('.refill-btn.agg-only').forEach(function(b){ b.style.display = 'none'; });
+    document.querySelectorAll('.refill-btn.agg-only').forEach(function(b){ b.setAttribute('style', 'display:none;'); });
     document.querySelector('.refill-btn[data-r="2"]').classList.add('active-refill');
   } else if (stratKey === 'agg') {
     customRefills = 4;
     document.querySelectorAll('.refill-btn').forEach(function(b){ b.className = b.classList.contains('agg-only') ? 'refill-btn agg-only' : 'refill-btn'; });
-    document.querySelectorAll('.refill-btn.agg-only').forEach(function(b){ b.style.display = 'flex'; });
+    document.querySelectorAll('.refill-btn.agg-only').forEach(function(b){ b.setAttribute('style', 'display:flex !important; text-align:center;'); });
     document.querySelector('.refill-btn[data-r="4"]').classList.add('active-refill');
   }
 }
@@ -343,11 +383,13 @@ function updateSliders() {
 document.getElementById('sl-vol').addEventListener('input', function(e) {
   customVol = parseFloat(e.target.value);
   document.getElementById('val-vol').textContent = customVol.toFixed(2);
+  fillSlider(e.target, STRATS[stratKey].color);
   render();
 });
 document.getElementById('sl-step').addEventListener('input', function(e) {
   customStep = parseInt(e.target.value);
   document.getElementById('val-step').textContent = customStep;
+  fillSlider(e.target, STRATS[stratKey].color);
   render();
 });
 document.querySelectorAll('.strat-btn').forEach(function(btn) {
