@@ -34,7 +34,7 @@
   .strat-btn.active-cons { background: var(--green-bg); color: var(--green); border-color: var(--green-border); font-weight: 600; }
   .strat-btn.active-mod  { background: var(--blue-bg);  color: var(--blue);  border-color: var(--blue-border);  font-weight: 600; }
   .strat-btn.active-agg  { background: var(--red-bg);   color: var(--red);   border-color: var(--red-border);   font-weight: 600; }
-  .refill-btn { flex: 1; padding: 10px 4px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: transparent; font-size: 12px; color: var(--text-secondary); cursor: pointer; font-family: inherit; text-align: center; display: flex; align-items: center; justify-content: center; }
+  .refill-btn { flex: 1; min-width: 80px; padding: 8px 10px; border-radius: var(--radius-sm); border: 0.5px solid var(--border); background: transparent; font-size: 12px; color: var(--text-secondary); cursor: pointer; font-family: inherit; text-align: center; display: flex; align-items: center; justify-content: center; }
   .refill-btn.active-refill { background: var(--blue-bg); color: var(--blue); border-color: var(--blue-border); font-weight: 600; }
   .refill-btn.agg-only { display: none; }
   .sliders-block { margin-bottom: 20px; }
@@ -163,7 +163,7 @@
   </div>
 
   <div id="refills-block" style="display:none;margin-bottom:16px;">
-    <div class="input-group">
+    <div class="input-group" style="max-width:50%;">
       <span class="input-label" id="refills-label">Количество доливов</span>
       <div class="strat-btns">
         <button class="refill-btn active-refill" data-r="1">1 долив (+100%)</button>
